@@ -21,11 +21,12 @@ db_name = 'series.db'
 
 def db_wrapper(func):
     def wrap():
-        connection = sqlite3.connect("series.db")
+        connection = sqlite3.connect(db_name)
         cursor = connection.cursor()
         func(cursor)
         connection.close()
     return wrap
+
 """
 Namespacing the application is good practice.  As the app grows,
 there could be more url routes in different folders. These child routes could then 

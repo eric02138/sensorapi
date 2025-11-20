@@ -2,15 +2,16 @@ import sqlite3
 import random
 from datetime import datetime
 
-
 SENSORS = ['sensor_001', 'sensor_002', 'sensor_003']
 # Realistic value ranges for water quality monitoring
 TEMP_RANGE = (20.0, 30.0) # Celsius
 CONDUCTIVITY_RANGE = (1000, 3000) # microsiemens/cm
 
+db_name = 'series.db'
+
 def db_wrapper(func):
     def wrap():
-        connection = sqlite3.connect("series.db")
+        connection = sqlite3.connect(db_name)
         cursor = connection.cursor()
         func(cursor)
         connection.close()
@@ -64,4 +65,5 @@ def do_db_stuff(cursor):
     print(result.fetchall())
     # connection.close()
 
-do_db_stuff()
+if __name__ == "__main__":
+    do_db_stuff()
