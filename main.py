@@ -55,7 +55,9 @@ class Measurements(Resource):
             'measurements': [1, 2, 3]
         }
     
+    @db_wrapper
     def post(self):
+        
         return
 
 if __name__ == '__main__':
