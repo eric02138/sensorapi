@@ -1,7 +1,6 @@
 from flask import Flask
 from flask_restx import Api, Namespace, Resource
-from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy.sql import text
+import sqlite3
 
 app = Flask(__name__)
 api = Api(app, 
@@ -12,16 +11,21 @@ api = Api(app,
 
 """
 Using SQLite to store measurement records because there's no installation required.
-I'll be using regular SQL for the queries (not sqlalchemy's object notation)
-to demonstrate that this could be any RDBS.  A NoSQL db could actually be more responsive,
-but I want to cut down on environment overhead.
+A NoSQL db could actually be more responsive, but I want to cut down on environment 
+overhead.
+Ordinarily, one would connect to a database using Flask-SQLAlchemy, but I want to 
+highlight the actual SQL queries I'll be making without the obfuscation of 
+SQLAlchemy's ORM layer.  And again, it keeps the installation to a minimum. 
 """
-db = SQLAlchemy()
 db_name = 'series.db'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + db_name
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = True
-db.init_app(app)
 
+def db_wrapper(func):
+    def wrap():
+        connection = sqlite3.connect("series.db")
+        cursor = connection.cursor()
+        func(cursor)
+        connection.close()
+    return wrap
 """
 Namespacing the application is good practice.  As the app grows,
 there could be more url routes in different folders. These child routes could then 
