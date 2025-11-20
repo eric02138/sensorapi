@@ -1,2 +1,2 @@
 # sensorapi
-Minimal backend that ingests sensor data 
+A minimal backend that ingests sensor data 
