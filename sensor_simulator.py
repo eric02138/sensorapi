@@ -15,9 +15,8 @@ def generate_measurement(sensor_id):
     """Generate a realistic sensor measurement."""
     return {
         'sensor_id': sensor_id,
-        'timestamp': datetime.utcnow().isoformat() + 'Z',  # Huh - I didn't know this was deprecated.
-                                                           # TZ aware datetimes are formatted slightly 
-                                                           # differently.  Something to keep an eye on.
+        'timestamp': datetime.utcnow().isoformat() + 'Z',  # Huh - utcnow() is deprecated.  
+                                                           # Maybe the sensor is using old code...
         'temperature': round(random.uniform(*TEMP_RANGE), 1),
         'conductivity': random.randint(*CONDUCTIVITY_RANGE)
     }
@@ -31,7 +30,7 @@ def send_measurement(measurement):
             f"Temp: {measurement['temperature']}°C, "
             f"Cond: {measurement['conductivity']} µS/cm")
         else:
-            print(f"Error {response.status_code}: {measurement['sensor_id']}")
+            print(f"HTTP Code {response.status_code}: {measurement['sensor_id']}")
     except requests.exceptions.ConnectionError:
         print(f"Connection failed for {measurement['sensor_id']} "
         f"(Is the server running at {API_URL}?)")
