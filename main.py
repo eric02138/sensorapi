@@ -1,5 +1,6 @@
 import json
 from datetime import datetime, timedelta, UTC
+from zoneinfo import ZoneInfo
 from flask import Flask
 from flask_restx import Api, Namespace, Resource, fields, reqparse
 from sqlalchemy import text, create_engine
@@ -47,12 +48,12 @@ dt_parser.add_argument('start_dt',
                        type=datetime.fromisoformat,
                        required=False,
                        help="Start datetime to aggregate from in ISO 8601 format "
-                       "(e.g., 2025-11-21T10:00:00)")
+                       "(e.g., 2025-11-21T10:00:00Z)")
 dt_parser.add_argument('end_dt',
                        type=datetime.fromisoformat,
                        required=False,
                        help="End datetime to aggregate from in ISO 8601 format "
-                       "(e.g., 2025-11-21T11:00:00)")
+                       "(e.g., 2025-11-21T11:00:00Z)")
 
 
 """
@@ -60,8 +61,8 @@ Namespacing the application is good practice.  As the app grows,
 there could be more url routes in different folders. These child routes could then 
 be attached to the parent at this level.
 """
-ns = Namespace('measuresments', 
-                            description="Namespace for measurement data")
+ns = Namespace('measurements', 
+                description="Namespace for measurement data")
 api.add_namespace(ns, '/measurements')
 
 measurement = api.model('Measurement', 
@@ -119,7 +120,65 @@ class Measurements(Resource):
             connection.execute(text(sql), params)
             connection.commit()
         return
-    
+
+sensor_measurement = api.schema_model('SensorMeasurement', {
+    'required': ['sensor_id'],
+    'properties': {
+        'sensor_id': {
+            'type': 'array',
+            'items': {
+                'type': 'string'
+            }
+        },
+        'agg_measurements': {
+            'type': 'array',
+            'items': {
+                'type': 'object',
+                'properties': {
+                    "interval_start": {
+                        'type': 'string',
+                        'format': 'date-time'
+                        }, 
+                    "min_temperature": {
+                        'type': 'number',
+                        'minimum': TEMP_RANGE[0],
+                        'maximum': TEMP_RANGE[1]
+                    }, 
+                    "max_temperature": {
+                        'type': 'number',
+                        'minimum': TEMP_RANGE[0],
+                        'maximum': TEMP_RANGE[1]
+                    }, 
+                    "avg_temperature": {
+                        'type': 'number',
+                        'minimum': TEMP_RANGE[0],
+                        'maximum': TEMP_RANGE[1]
+                    }, 
+                    "min_conductivity": {
+                        'type': 'number',
+                        'minimum': CONDUCTIVITY_RANGE[0],
+                        'maximum': CONDUCTIVITY_RANGE[1]
+                    },
+                    "max_conductivity": {
+                        'type': 'number',
+                        'minimum': CONDUCTIVITY_RANGE[0],
+                        'maximum': CONDUCTIVITY_RANGE[1]
+                    },
+                    "avg_conductivity": {
+                        'type': 'number',
+                        'minimum': CONDUCTIVITY_RANGE[0],
+                        'maximum': CONDUCTIVITY_RANGE[1]
+                    },
+                    "record_count": {
+                        'type': 'number'
+                    }
+                }
+            }
+        },
+    },
+    'type': 'object'
+})
+
 """
 Returns measurement data for a specified sensor.
 params:
@@ -130,6 +189,7 @@ returns:
     - json serialized list of aggregated measurement objects
 """
 @ns.route('/<sensor_id>')
+@api.doc(params={'sensor_id': 'Sensor ID'})
 class SensorMeasurements(Resource):
     """
     Get Measurements by sensor (and filter by query parameters)
@@ -140,6 +200,7 @@ class SensorMeasurements(Resource):
     returns:
         - a json-serialized 
     """
+    @api.marshal_with(sensor_measurement)
     def get(self, sensor_id):
         with engine.connect() as connection:
 
@@ -153,12 +214,21 @@ class SensorMeasurements(Resource):
                 start_dt = end_dt - timedelta(hours=GRANULARITY_THRESHOLD)
 
             if start_dt_query_param: 
-                start_dt = datetime.strptime(start_dt_query_param)
+                start_dt = start_dt_query_param
                 end_dt = start_dt + timedelta(hours=GRANULARITY_THRESHOLD)
             if end_dt_query_param:
-                end_dt = datetime.strptime(end_dt_query_param)
+                end_dt = end_dt_query_param
                 if not start_dt_query_param:  # assume the user wants the previous hour
                     start_dt = end_dt - timedelta(hours=GRANULARITY_THRESHOLD)  
+
+            """
+            Need to convert start and end datetimes into timezone-aware values, 
+            so they can be compared to the timezone-aware values in the database.
+            """
+            if start_dt.tzinfo is None or start_dt.tzinfo.utcoffset is None:
+                start_dt = start_dt.replace(tzinfo=ZoneInfo("UTC"))
+            if end_dt.tzinfo is None or end_dt.tzinfo.utcoffset is None:
+                end_dt = end_dt.replace(tzinfo=ZoneInfo("UTC"))
 
             """
             if the end datetime is within the last hour, assume the user wants to see 5 minute
@@ -177,16 +247,15 @@ class SensorMeasurements(Resource):
             reconstitutes the value, having lopped off the unwanted extra seconds.  Pretty 
             clever, I wish I had throught of it.
             """
-
             sql = """
                 SELECT
                 strftime('%Y-%m-%dT%H:%M:%S.%fZ', datetime((strftime('%s', timestamp) / (5 * 60)) * (5 * 60), 'unixepoch')) AS interval_start,
                 MIN(temperature) AS min_temperature,
                 MAX(temperature) AS max_temperature,
-                AVG(temperature) AS average_temperature,
+                AVG(temperature) AS avg_temperature,
                 MIN(conductivity) AS min_conductivity,
                 MAX(conductivity) AS max_conductivity,
-                AVG(conductivity) AS average_conductivity,
+                AVG(conductivity) AS avg_conductivity,
                 COUNT(*) AS record_count
                 FROM
                 measurements
@@ -199,8 +268,6 @@ class SensorMeasurements(Resource):
                 interval_start desc;
             """
 
-            # sql = f"""select * from measurements where sensor_id=:sensor_id
-            #           order by timestamp desc"""
             params = {'sensor_id': sensor_id,
                       'start_dt': start_dt, 
                       'end_dt': end_dt,
@@ -211,16 +278,16 @@ class SensorMeasurements(Resource):
                 dd = {
                     'interval_start': row[0],
                     'min_temperature': row[1],
-                    'min_temperature': row[2],
-                    'min_temperature': row[3],
+                    'max_temperature': row[2],
+                    'avg_temperature': row[3],
                     'min_conductivity': row[4],
-                    'min_conductivity': row[5],
-                    'min_conductivity': row[6],
+                    'max_conductivity': row[5],
+                    'avg_conductivity': row[6],
                     'record_count': row[7]
                 }
                 measurements.append(dd)
             result = {'sensor_ids': [sensor_id], 
-                      'measurements': measurements}
+                      'agg_measurements': measurements}
         return json.dumps(result)
     
 if __name__ == '__main__':
