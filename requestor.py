@@ -33,3 +33,22 @@ print(json.loads(response.content))
 # response = requests.get(SENSOR_API_URL,  timeout=5)
 # print(response.status_code)
 # print(json.loads(response.content))
+
+# Retrieves aggregated data for sensor_002 using start time
+# SENSOR_API_URL = 'http://localhost:5000/measurements/sensor_002?start_dt=2025-11-22T15:33:26'
+# response = requests.get(SENSOR_API_URL,  timeout=5)
+# print(response.status_code)
+# print(json.loads(response.content))
+
+# Retrieves aggregated data between two times for sensor_002
+# Note: time period must be larger than time chunk.
+# SENSOR_API_URL = 'http://localhost:5000/measurements/sensor_002?start_dt=2025-11-21T15:40:41&end_dt=2025-11-21T17:55:41'
+# response = requests.get(SENSOR_API_URL,  timeout=5)
+# print(response.status_code)
+# print(json.loads(response.content))
+
+# Retrieves aggregated data between two times for sensor_002
+# SENSOR_API_URL = 'http://localhost:5000/measurements/sensor_002?start_dt=2025-11-22T15:43:26&end_dt=2025-11-22T15:53:26'
+# response = requests.get(SENSOR_API_URL,  timeout=5)
+# print(response.status_code)
+# print(json.loads(response.content))

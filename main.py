@@ -195,12 +195,13 @@ class SensorMeasurements(Resource):
             intervals.  Otherwise, assume they want to see 60 minute intervals.
             """ 
             data_granularity = DATA_GRANULARITY[0]
-            if end_dt >= datetime.now(UTC) - timedelta(hours=GRANULARITY_THRESHOLD):
+            if end_dt >= datetime.now(UTC) - timedelta(hours=GRANULARITY_THRESHOLD) or \
+                start_dt >= datetime.now(UTC) - timedelta(hours=GRANULARITY_THRESHOLD):
                 data_granularity = DATA_GRANULARITY[1]
 
             start_dt = start_dt.strftime('%Y-%m-%dT%H:%M:%S.%fZ')
             end_dt = end_dt.strftime('%Y-%m-%dT%H:%M:%S.%fZ')
-            
+
             """
             Modified from Stackoverflow.  The integer division in this query essentially
             takes a numerical unix timestamp, divides it by the specified interval and then 
