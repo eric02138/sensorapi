@@ -23,7 +23,6 @@ app = Flask(__name__)
 api = Api(app, 
           version='1.0', 
           title='Sensor API', 
-        #   doc='/doc',
           description='A minimal backend that ingests sensor data ')
 
 """
@@ -35,11 +34,6 @@ raw sql queries to underscore that each function maps directly to a query, witho
 the obfuscation of an ORM.  Oddly, Flask makes doing this seemingly simple connection 
 surprisingly difficult.  
 """
-# app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///measurements.db"
-
-# db = SQLAlchemy()
-# db.init_app(app)
-
 db_url = "sqlite:///measurements.db"
 engine = create_engine(db_url)
 
@@ -92,6 +86,7 @@ class Measurements(Resource):
     """
     Default route - just get the sensor ids
     """
+    @ns.marshal_with(measurement)
     def get(self):
         with engine.connect() as connection:
             sql = """select distinct(sensor_id) from measurements"""
@@ -121,63 +116,29 @@ class Measurements(Resource):
             connection.commit()
         return
 
-sensor_measurement = api.schema_model('SensorMeasurement', {
-    'required': ['sensor_id'],
-    'properties': {
-        'sensor_id': {
-            'type': 'array',
-            'items': {
-                'type': 'string'
-            }
-        },
-        'agg_measurements': {
-            'type': 'array',
-            'items': {
-                'type': 'object',
-                'properties': {
-                    "interval_start": {
-                        'type': 'string',
-                        'format': 'date-time'
-                        }, 
-                    "min_temperature": {
-                        'type': 'number',
-                        'minimum': TEMP_RANGE[0],
-                        'maximum': TEMP_RANGE[1]
-                    }, 
-                    "max_temperature": {
-                        'type': 'number',
-                        'minimum': TEMP_RANGE[0],
-                        'maximum': TEMP_RANGE[1]
-                    }, 
-                    "avg_temperature": {
-                        'type': 'number',
-                        'minimum': TEMP_RANGE[0],
-                        'maximum': TEMP_RANGE[1]
-                    }, 
-                    "min_conductivity": {
-                        'type': 'number',
-                        'minimum': CONDUCTIVITY_RANGE[0],
-                        'maximum': CONDUCTIVITY_RANGE[1]
-                    },
-                    "max_conductivity": {
-                        'type': 'number',
-                        'minimum': CONDUCTIVITY_RANGE[0],
-                        'maximum': CONDUCTIVITY_RANGE[1]
-                    },
-                    "avg_conductivity": {
-                        'type': 'number',
-                        'minimum': CONDUCTIVITY_RANGE[0],
-                        'maximum': CONDUCTIVITY_RANGE[1]
-                    },
-                    "record_count": {
-                        'type': 'number'
-                    }
-                }
-            }
-        },
-    },
-    'type': 'object'
-})
+sensor_measurement = api.model('SensorMeasurement',
+    {
+        'interval_start': fields.DateTime(dt_format="%Y-%m-%dT%H:%M:%S.%fZ",
+                                          description="Beginning of the aggregation period"),
+        'min_temperature': fields.Float(description="Minimum temperature for the aggregation period"),
+        'max_temperature': fields.Float(description="Maximum temperature for the aggregation period"),
+        'avg_temperature': fields.Float(description="Average temperature for the aggregation period"),
+        'min_conductivity': fields.Float(description="Minimum conductivity for the aggregation period"),
+        'max_conductivity': fields.Float(description="Maximum conductivity for the aggregation period"),
+        'avg_conductivity': fields.Float(description="Average conductivity for the aggregation period"),
+        'record_count': fields.Integer(description="Number of measurement records aggregated")
+    }
+)
+
+agg_sensor_measurement = api.model('AggSensorMeasurement', 
+    {
+        'sensor_id': fields.String(required=True, 
+                                   description="Unique sensor id"),
+        'agg_measurements': fields.Nested(
+            sensor_measurement
+        )
+    }
+)
 
 """
 Returns measurement data for a specified sensor.
@@ -200,7 +161,8 @@ class SensorMeasurements(Resource):
     returns:
         - a json-serialized 
     """
-    @api.marshal_with(sensor_measurement)
+
+    @ns.marshal_with(agg_sensor_measurement)
     def get(self, sensor_id):
         with engine.connect() as connection:
 
@@ -286,7 +248,7 @@ class SensorMeasurements(Resource):
                     'record_count': row[7]
                 }
                 measurements.append(dd)
-            result = {'sensor_ids': [sensor_id], 
+            result = {'sensor_id': sensor_id, 
                       'agg_measurements': measurements}
         return json.dumps(result)
     
