@@ -6,7 +6,8 @@ I wanted to make setting up this demo as simple as possible, with minimal depend
 
 ## Installation
 Create a virtual environment with a recent-ish version of Python 3 - I'm using Python 3.12.7.  Pyenv is nifty, too.  
-`>> pyenv virtualenv sensorapi`
+`>> pyenv virtualenv sensorapi`  
+`>> pyenv activate sensorapi`  
 
 Next, install the python packages we'll be using:  
 `>> pip install -r requirements.txt`  
