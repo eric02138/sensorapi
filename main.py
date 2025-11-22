@@ -86,7 +86,6 @@ class Measurements(Resource):
     """
     Default route - just get the sensor ids
     """
-    @ns.marshal_with(measurement)
     def get(self):
         with engine.connect() as connection:
             sql = """select distinct(sensor_id) from measurements"""
@@ -134,8 +133,9 @@ agg_sensor_measurement = api.model('AggSensorMeasurement',
     {
         'sensor_id': fields.String(required=True, 
                                    description="Unique sensor id"),
-        'agg_measurements': fields.Nested(
-            sensor_measurement
+        'agg_measurements': fields.List(
+            fields.Nested(sensor_measurement, 
+                          description="A list of sensor measurements")
         )
     }
 )
@@ -161,8 +161,6 @@ class SensorMeasurements(Resource):
     returns:
         - a json-serialized 
     """
-
-    @ns.marshal_with(agg_sensor_measurement)
     def get(self, sensor_id):
         with engine.connect() as connection:
 
@@ -211,7 +209,7 @@ class SensorMeasurements(Resource):
             """
             sql = """
                 SELECT
-                strftime('%Y-%m-%dT%H:%M:%S.%fZ', datetime((strftime('%s', timestamp) / (5 * 60)) * (5 * 60), 'unixepoch')) AS interval_start,
+                strftime('%Y-%m-%dT%H:%M:%S.%fZ', datetime((strftime('%s', timestamp) / (:data_granularity * 60)) * (:data_granularity * 60), 'unixepoch')) AS interval_start,
                 MIN(temperature) AS min_temperature,
                 MAX(temperature) AS max_temperature,
                 AVG(temperature) AS avg_temperature,
@@ -251,6 +249,6 @@ class SensorMeasurements(Resource):
             result = {'sensor_id': sensor_id, 
                       'agg_measurements': measurements}
         return json.dumps(result)
-    
+
 if __name__ == '__main__':
     app.run(debug=True)
